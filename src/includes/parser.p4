@@ -1,77 +1,264 @@
-/*
-Copyright 2013-present Barefoot Networks, Inc. 
+#pragma once
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
-parser start {
-    return parse_ethernet;
+enum bit<16> ether_type_t {
+    IPV4 = 0x0800,
+    ARP  = 0x0806
 }
 
-#define ETHERTYPE_IPV4 0x0800
+enum bit<8> ipv4_proto_t {
+    TCP = 6,
+    UDP = 17,
+    ICMP = 1
+}
 
-header ethernet_t ethernet;
+enum bit<16> udp_port_t {
+    ROCE_V2 = 4791
+}
 
-parser parse_ethernet {
-    extract(ethernet);
-    return select(latest.etherType) {
-        ETHERTYPE_IPV4 : parse_ipv4;
-        default: ingress;
+
+// ---------------------------------------------------------------------------
+// Ingress parser
+// ---------------------------------------------------------------------------
+parser SwitchIngressParser(
+    packet_in pkt,
+    out header_t hdr,
+    out metadata_t meta,
+    out ingress_intrinsic_metadata_t ig_intr_md,
+    out ingress_intrinsic_metadata_for_tm_t ig_intr_md_for_tm,
+    out ingress_intrinsic_metadata_from_parser_t ig_intr_md_from_prsr){
+
+
+	state start {
+        pkt.extract(ig_intr_md);
+        transition parse_port_metadata;
+	}
+
+    state parse_port_metadata {
+        meta.port_md = port_metadata_unpack<port_metadata_t>(pkt);
+        transition init_metadata;
+    }
+
+    state init_metadata { // init bridged_meta (based on slide 23 of BA-1122)
+        transition parse_ethernet;
+    }
+    
+	state parse_ethernet {
+		pkt.extract(hdr.ethernet);
+		transition select(hdr.ethernet.ether_type){
+			(bit<16>) ether_type_t.IPV4: parse_ipv4;
+			(bit<16>) ether_type_t.ARP: parse_arp;
+			default: accept;
+		}
+	}
+
+	state parse_ipv4 {
+		pkt.extract(hdr.ipv4);
+		transition select(hdr.ipv4.protocol){
+			(bit<8>) ipv4_proto_t.TCP: parse_tcp;
+			(bit<8>) ipv4_proto_t.UDP: parse_udp;
+            (bit<8>) ipv4_proto_t.ICMP: parse_icmp;
+		    default: accept;
+		}
+	}
+
+	state parse_arp {
+		pkt.extract(hdr.arp);
+		transition accept;
+	}
+
+	state parse_tcp {
+		pkt.extract(hdr.tcp);
+		transition accept;
+	}
+
+	state parse_udp {
+		pkt.extract(hdr.udp);
+        transition select(hdr.udp.dst_port) {
+            (bit<16>) udp_port_t.ROCE_V2: parse_bth; 
+            default: accept;
+        }
+	}
+
+    state parse_bth {
+        pkt.extract(hdr.bth);
+        transition select(hdr.bth.opcode) {
+            0x04 : parse_deth; // RC RDMA SEND-ONLY (4)
+            0x06 : parse_reth; // RC RDMA WRITE FIRST (6)
+            0x11 : parse_aeth; // RC RDMA ACK (17)
+            default: accept;
+
+        }
+    }
+
+    state parse_reth {
+        pkt.extract(hdr.reth);
+        transition accept;
+    }
+
+    state parse_deth {
+        pkt.extract(hdr.deth);
+        transition accept;
+    }
+
+    state parse_aeth {
+        pkt.extract(hdr.aeth);
+        transition accept;
+    }
+
+    state parse_icmp {
+        pkt.extract(hdr.icmp);
+        transition accept;
     }
 }
 
-header ipv4_t ipv4;
 
-field_list ipv4_checksum_list {
-        ipv4.version;
-        ipv4.ihl;
-        ipv4.diffserv;
-        ipv4.totalLen;
-        ipv4.identification;
-        ipv4.flags;
-        ipv4.fragOffset;
-        ipv4.ttl;
-        ipv4.protocol;
-        ipv4.srcAddr;
-        ipv4.dstAddr;
-}
+// ---------------------------------------------------------------------------
+// Ingress Deparser
+// ---------------------------------------------------------------------------
+control SwitchIngressDeparser(
+        packet_out pkt,
+        inout header_t hdr,
+        in metadata_t meta,
+        in ingress_intrinsic_metadata_for_deparser_t ig_dprsr_md) {
 
-field_list_calculation ipv4_checksum {
-    input {
-        ipv4_checksum_list;
-    }
-    algorithm : csum16;
-    output_width : 16;
-}
+    Checksum() ipv4_checksum;
 
-calculated_field ipv4.hdrChecksum  {
-    verify ipv4_checksum;
-    update ipv4_checksum;
-}
+    apply {
+        hdr.ipv4.hdr_checksum = ipv4_checksum.update({
+            hdr.ipv4.version,
+            hdr.ipv4.ihl,
+            hdr.ipv4.dscp,
+            hdr.ipv4.ecn,
+            hdr.ipv4.total_len,
+            hdr.ipv4.identification,
+            hdr.ipv4.flags,
+            hdr.ipv4.frag_offset,
+            hdr.ipv4.ttl,
+            hdr.ipv4.protocol,
+            hdr.ipv4.src_addr,
+            hdr.ipv4.dst_addr});
 
-#define IP_PROTOCOLS_TCP 6
-
-parser parse_ipv4 {
-    extract(ipv4);
-    return select(latest.protocol) {
-        IP_PROTOCOLS_TCP : parse_tcp;
-        default: ingress;
+        pkt.emit(hdr);
     }
 }
 
-header tcp_t tcp;
 
-parser parse_tcp {
-    extract(tcp);
-    return ingress;
+// ---------------------------------------------------------------------------
+// Egress parser
+// ---------------------------------------------------------------------------
+parser SwitchEgressParser(
+    packet_in pkt,
+    out header_t hdr,
+    out metadata_t meta,
+    out egress_intrinsic_metadata_t eg_intr_md,
+    out egress_intrinsic_metadata_from_parser_t eg_intr_md_from_prsr){
+
+    // internal_hdr_h internal_hdr;
+    state start {
+        // pkt.extract(eg_intr_md);
+        // transition parse_metadata;
+        transition accept;
+    }
+
+    state parse_metadata {
+        transition parse_ethernet; // if no ig/eg_mirroring
+    }
+
+    /* mirroring */
+    state parse_ig_mirror_md {
+        pkt.extract(meta.ig_mirror1);
+        transition parse_ethernet;
+    }
+
+    state parse_eg_mirror_md {
+        pkt.extract(meta.eg_mirror1);
+        transition parse_ethernet;
+    }
+
+    state parse_ethernet {
+		pkt.extract(hdr.ethernet);
+		transition select(hdr.ethernet.ether_type){
+			(bit<16>) ether_type_t.IPV4: parse_ipv4;
+			(bit<16>) ether_type_t.ARP: parse_arp;
+			default: accept;
+		}
+	}
+
+	state parse_ipv4 {
+		pkt.extract(hdr.ipv4);
+		transition select(hdr.ipv4.protocol){
+			(bit<8>) ipv4_proto_t.TCP: parse_tcp;
+			(bit<8>) ipv4_proto_t.UDP: parse_udp;
+            (bit<8>) ipv4_proto_t.ICMP: parse_icmp;
+		    default: accept;
+		}
+	}
+
+	state parse_arp {
+		pkt.extract(hdr.arp);
+		transition accept;
+	}
+
+	state parse_tcp {
+		pkt.extract(hdr.tcp);
+		transition accept;
+	}
+
+	state parse_udp {
+		pkt.extract(hdr.udp);
+        transition select(hdr.udp.dst_port) {
+            (bit<16>) udp_port_t.ROCE_V2: parse_bth; 
+            default: accept;
+        }
+	}
+
+    state parse_bth {
+        pkt.extract(hdr.bth);
+        transition select(hdr.bth.opcode) {
+            0x04 : parse_deth; // RC RDMA SEND-ONLY (4)
+            0x06 : parse_reth; // RC RDMA WRITE FIRST (6)
+            0x11 : parse_aeth; // RC RDMA ACK (17)
+            default: accept;
+
+            // 0x0A : parse_reth; // RC RDMA WRITE-ONLY (10) - RETH (not sure)
+            // 0x2A : parse_reth; // UC RDMA Write (42) - RETH (not sure)
+            // 0x64 : parse_deth; // UC RDMA SEND-ONLY - DETH (not sure)
+        }
+    }
+
+    state parse_reth {
+        pkt.extract(hdr.reth);
+        transition accept;
+    }
+
+    state parse_deth {
+        pkt.extract(hdr.deth);
+        transition accept;
+    }
+
+    state parse_aeth {
+        pkt.extract(hdr.aeth);
+        transition accept;
+    }
+
+    state parse_icmp {
+        pkt.extract(hdr.icmp);
+        transition accept;
+    }
+    // do more stuff here if needed
+}
+
+// ---------------------------------------------------------------------------
+// Egress Deparser
+// ---------------------------------------------------------------------------
+control SwitchEgressDeparser(
+    packet_out pkt,
+    inout header_t hdr,
+    in metadata_t meta,
+    in egress_intrinsic_metadata_for_deparser_t eg_intr_md_for_dprsr,
+    in egress_intrinsic_metadata_t eg_intr_md,
+    in egress_intrinsic_metadata_from_parser_t eg_intr_md_from_prsr){
+
+	apply{}
 }

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-header_type intrinsic_metadata_t {
+header intrinsic_metadata_t {
     fields {
         ingress_global_timestamp : 48;
         lf_field_list : 32;
