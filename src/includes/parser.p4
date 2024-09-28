@@ -165,16 +165,6 @@ parser SwitchEgressParser(
         transition parse_ethernet; // if no ig/eg_mirroring
     }
 
-    /* mirroring */
-    state parse_ig_mirror_md {
-        pkt.extract(meta.ig_mirror1);
-        transition parse_ethernet;
-    }
-
-    state parse_eg_mirror_md {
-        pkt.extract(meta.eg_mirror1);
-        transition parse_ethernet;
-    }
 
     state parse_ethernet {
 		pkt.extract(hdr.ethernet);
