@@ -10,13 +10,26 @@
 #include "includes/parser.p4"
 
 const int MCAST_GRP_ID = 1; // for ARP
-const bit<9> RECIRC_PORT_PIPE_1 = 196; // recirculation port
-const bit<32> OUT_OF_RANGE_24BIT = 32w16777216; // 2^24
-const int FLOWLET_TABLE_SIZE=65535;	// a table for different flowlet 2^16
-const bit<16> FLOWLET_TIMEOUT = 16w20000;
-
-
+const int FLOWLET_TABLE_SIZE=1024;	// a table for different flowlet 2^16
+const timestamp_t FLOWLET_TIMEOUT = 16w20000;
 const int MAX_PORTS = 256;
+
+
+// RegisterAction<bit<8>,bit<16>,bit<8>>(flowlet_table_id)
+// flowlet_read_id={
+// 	void apply(inout bit<8> p,out bit<8> out_p){
+// 		out_p=p;
+// 	}
+// };
+
+
+// RegisterAction<bit<8>,bit<16>,void>(flowlet_table_id)
+// flowlet_add_id={
+// 	void apply(inout bit<8> p){
+// 		p+=8w1;
+// 	}
+// };
+
 
 
 
@@ -33,16 +46,7 @@ control SwitchIngress(
 
     Hash<bit<16>>(HashAlgorithm_t.CRC16) flowlet_hash;
 	Register<timestamp_t,bit<16>>(FLOWLET_TABLE_SIZE) flowlet_table_timestamp;
-	Register<bit<8>,bit<16>>(FLOWLET_TABLE_SIZE) flowlet_table_port;
-	Register<bit<1>,bit<16>>(FLOWLET_TABLE_SIZE) flowlet_table_valid;
-    
-
-    // RegisterAction<bit<16>, bit<16>, void>(flowlet_id_reg)
-    // update_flowlet_id = {  
-    //     void apply(inout bit<16> id) {  
-    //         id=id+1;    // maybe overflow
-    //     }  
-    // };  
+	// Register<bit<8>,bit<16>>(FLOWLET_TABLE_SIZE) flowlet_table_id;
 
 	RegisterAction<timestamp_t,bit<16>,timestamp_t>(flowlet_table_timestamp)
 	flowlet_read_timestamp={
@@ -51,117 +55,28 @@ control SwitchIngress(
 		}
 	};
 
-	RegisterAction<bit<8>,bit<16>,bit<8>>(flowlet_table_port)
-	flowlet_read_port={
-		void apply(inout bit<8> p,out bit<8> out_p){
-			out_p=p;
+	RegisterAction<timestamp_t,bit<16>,void>(flowlet_table_timestamp)
+	flowlet_set_timestamp={
+		void apply(inout timestamp_t t){
+			t=meta.current_timestamp;
 		}
 	};
 
-	RegisterAction<bit<1>,bit<16>,bit<1>>(flowlet_table_valid)
-	flowlet_read_valid={
-		void apply(inout bit<1> valid,out bit<1> out_valid){
-			out_valid=valid;
-		}
-	};
 
-	/**
-		serialize and deserialize for flowlet table
-	*/
-    // action serialize_flowlet(in flowlet_t f, out serialized_flowlet_t s) {  
-    //     s = f.timestamp ++ f.dst_port ++ f.valid; // 7 bit   
-    // }  
-
-    // action deserialize_flowlet(in serialized_flowlet_t s, out flowlet_t f) {  
-    //     f.timestamp = s[40:9];  
-    //     f.dst_port = s[8:1];  
-    //     f.valid = s[0:0];  
-    // }  
-
-
-	/**
-	 * @brief L2 Forwarding
-	 */
-	// action nop(){}
-	// action drop(){
-	// 	ig_intr_md_for_dprsr.drop_ctl = 0b001;
-	// }
-
-	// action miss(bit<3> drop_bits) {
-	// 	ig_intr_md_for_dprsr.drop_ctl = drop_bits;
-	// }
-
-	// action forward(PortId_t port){
-	// 	ig_intr_md_for_tm.ucast_egress_port = port;
-	// }
-
-	/* What we mainly use for switching/routing */
-	// table l2_forward {
-	// 	key = {
-	// 		meta.port_md.switch_id: exact;
-	// 		hdr.ethernet.dst_addr: exact;
-	// 	}
-
-	// 	actions = {
-	// 		forward;
-	// 		@defaultonly miss;
-	// 	}
-
-	// 	const default_action = miss(0x1);
-	// }
-
-	// action subtrace_48bit(bit<48> a, bit<48> b){
-	// 	// Split the 48-bit numbers into 32-bit lower and 16-bit upper parts  
-    //     bit<32> a_lower = (bit<32>)a[31:0];  
-    //     bit<16> a_upper = (bit<16>)a[47:32];  
-    //     bit<32> b_lower = (bit<32>)b[31:0];  
-    //     bit<16> b_upper = (bit<16>)b[47:32];  
-
-    //     // Perform subtraction on lower 32 bits  
-    //     bit<32> diff_lower = a_lower - b_lower;  
-        
-    //     // Check for borrow from lower subtraction  
-    //     meta.borrow = (a_lower < b_lower) ? 1w1 : 1w0;  
-
-    //     // Perform subtraction on upper 16 bits, including borrow  
-    //     bit<16> diff_upper = a_upper - b_upper - (bit<16>)meta.borrow;  
-
-    //     // Store results in metadata  
-    //     meta.lower = diff_lower;  
-    //     meta.upper = diff_upper;  
-	// }
-
-
-
-	// RegisterAction<serialized_flowlet_t,_,void>(flowlet_table)
-	// flowlet_update={
-	// 	void apply(inout serialized_flowlet_t value){
-	// 		value=meta.serialized_flowlet;
-	// 	}
-	// };
-	action calculate_time_gap(){
-		// if the time gap is more than flowlet timeout
-		meta.time_gap =meta.ingress_timestamp[15:0]-meta.flowlet.timestamp[15:0];
+    
+	action read_flowlet(){
+		// Get hash val for this connect
+		meta.hash_val=flowlet_hash.get({hdr.ipv4.src_addr,
+		hdr.ipv4.dst_addr,
+		hdr.bth.destination_qp});
+		meta.last_timestamp=flowlet_read_timestamp.execute(meta.hash_val);
+		// meta.dst_port=flowlet_read_port.execute(meta.hash_val);
 	}
 
-	/* let it flow core algorithm hh~*/
-	action choose_random_port(){
-		meta.dst_port=8w1;
-		meta.flowlet.valid=1w1;		// set valid
+	action check_flowlet_timeout(){
+		
 	}
-	table flowlet_timeout_table{
-		key={
-			meta.time_gap : range;
-		}
-		actions={
-			choose_random_port;
-			@defaultonly NoAction;
-		}
-		const default_action=NoAction();
-		size = 65536;
-	}
-
-
+	
 
 	apply {
 		if(hdr.ethernet.ether_type == (bit<16>) ether_type_t.ARP){
@@ -171,30 +86,18 @@ control SwitchIngress(
 		} else { // non-arp packet	
 
 			if (hdr.bth.isValid()){ // if RDMA 
-				meta.ingress_timestamp=ig_intr_md.ingress_mac_tstamp[31:0];
-				meta.time_out=FLOWLET_TABLE_SIZE;
+				// get current timestamp  
+				meta.current_timestamp=ig_intr_md.ingress_mac_tstamp[15:0];
+				meta.FLOWLET_TIMEOUT=FLOWLET_TIMEOUT;
+
 				// three tuple to identify a RDMA flow?
-				meta.hash_val=flowlet_hash.get({hdr.ipv4.src_addr,
-				hdr.ipv4.dst_addr,
-				hdr.bth.destination_qp});
-				bit<16> index=meta.hash_val;
-
-				flowlet_t parsed_flowlet;  
-				parsed_flowlet.timestamp=flowlet_read_timestamp.execute(index);  
-				parsed_flowlet.dst_port=flowlet_read_port.execute(index);  
-				parsed_flowlet.valid=flowlet_read_valid.execute(index);  
-				meta.flowlet = parsed_flowlet;  
-
-
-				meta.flowlet.timestamp=meta.ingress_timestamp;		// set new timestamp
-				// serialize_flowlet(meta.flowlet,meta.serialized_flowlet);
-				// flowlet_update.execute(meta.hash_val);
-				if (meta.flowlet.valid==1w0){
-					choose_random_port();	// first, we need choose a random port
-				}else{
-					calculate_time_gap();
-					flowlet_timeout_table.apply();
-				}
+				read_flowlet();
+				meta.time_gap=meta.current_timestamp-meta.last_timestamp;
+ 				if(meta.time_gap>=meta.FLOWLET_TIMEOUT){
+					meta.dst_port=8w1;
+				} 
+				// write_flowlet();
+				// flowlet_set_timestamp.execute(meta.hash_val);
 			}
 		}
 	}
@@ -217,8 +120,31 @@ control SwitchEgress(
     inout egress_intrinsic_metadata_for_deparser_t eg_intr_md_for_dprsr,
     inout egress_intrinsic_metadata_for_output_port_t eg_intr_md_for_oport){
 
+	Register<bit<8>,bit<16>>(FLOWLET_TABLE_SIZE) flowlet_table_port;
 
-	apply{}
+	RegisterAction<bit<8>,bit<16>,bit<8>>(flowlet_table_port)
+	flowlet_read_port={
+		void apply(inout bit<8> p,out bit<8> out_p){
+			out_p=p;
+		}
+	};
+
+	RegisterAction<bit<8>,bit<16>,void>(flowlet_table_port)
+	flowlet_set_port={
+		void apply(inout bit<8> p){
+			p=meta.dst_port;
+		}
+	};
+
+	action write_flowlet(){
+
+	}
+
+
+	apply{
+		flowlet_set_port.execute(meta.hash_val);
+
+	}
 
 
 } // End of SwitchEgress
