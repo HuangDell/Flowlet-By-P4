@@ -10,31 +10,10 @@
 #include "includes/parser.p4"
 
 const int MCAST_GRP_ID = 1; // for ARP
-const int FLOWLET_TABLE_SIZE=1024;	// a table for different flowlet 2^16
-const timestamp_t FLOWLET_TIMEOUT = 16w20000;
+const bit<32> FLOWLET_TABLE_SIZE=32w65535;	// a table for different flowlet 2^16
+const timestamp_t FLOWLET_TIMEOUT = 32w20000;
 const int MAX_PORTS = 256;
 
-
-// RegisterAction<bit<8>,bit<16>,bit<8>>(flowlet_table_id)
-// flowlet_read_id={
-// 	void apply(inout bit<8> p,out bit<8> out_p){
-// 		out_p=p;
-// 	}
-// };
-
-
-// RegisterAction<bit<8>,bit<16>,void>(flowlet_table_id)
-// flowlet_add_id={
-// 	void apply(inout bit<8> p){
-// 		p+=8w1;
-// 	}
-// };
-
-
-
-
-// Register<serialized_flowlet_t,_>(FLOWLET_TABLE_SIZE) flowlet_table;
-// Register<bit<16>,_>(1) flowlet_id_reg;
 
 control SwitchIngress(
     inout header_t hdr,
@@ -45,38 +24,73 @@ control SwitchIngress(
     inout ingress_intrinsic_metadata_for_tm_t ig_intr_md_for_tm){
 
     Hash<bit<16>>(HashAlgorithm_t.CRC16) flowlet_hash;
-	Register<timestamp_t,bit<16>>(FLOWLET_TABLE_SIZE) flowlet_table_timestamp;
-	// Register<bit<8>,bit<16>>(FLOWLET_TABLE_SIZE) flowlet_table_id;
 
-	RegisterAction<timestamp_t,bit<16>,timestamp_t>(flowlet_table_timestamp)
-	flowlet_read_timestamp={
-		void apply(inout timestamp_t t,out timestamp_t cur_t){
-			cur_t=t;
+	Register<timestamp_t,bit<16>>(FLOWLET_TABLE_SIZE) flowlet_time;
+	Register<bit<8>,bit<16>>(FLOWLET_TABLE_SIZE) flowlet_port_index;
+	Register<bit<1>,bit<16>>(FLOWLET_TABLE_SIZE) flowlet_valid;
+
+	Random<bit<2>>() random_port;
+
+	RegisterAction<timestamp_t,bit<16>,bit<1>>(flowlet_time)
+	check_new_flowlet={
+		void apply(inout timestamp_t data,out bit<1> new_flowlet){
+			new_flowlet=0;
+
+			if(meta.current_time-data>=FLOWLET_TIMEOUT || meta.valid==0){
+				new_flowlet=1;
+			}
+			data=meta.current_time;
 		}
 	};
 
-	RegisterAction<timestamp_t,bit<16>,void>(flowlet_table_timestamp)
-	flowlet_set_timestamp={
-		void apply(inout timestamp_t t){
-			t=meta.current_timestamp;
+	RegisterAction<bit<8>,bit<16>,bit<8>>(flowlet_port_index)
+	read_port_index={
+		void apply(inout bit<8> data,out bit<8> port_index){
+			port_index=data;
+		}
+	};
+
+	RegisterAction<bit<8>,bit<16>,bit<8>>(flowlet_port_index)
+	write_port_index={
+		void apply(inout bit<8> data){
+			data=(bit<8>)meta.port_index;
+		}
+	};
+
+	RegisterAction<bit<1>,bit<16>,bit<1>>(flowlet_valid)
+	check_valid={
+		void apply(inout bit<1> data,out bit<1> valid){
+			valid=data;
+			data=1;
 		}
 	};
 
 
-    
-	action read_flowlet(){
-		// Get hash val for this connect
-		meta.hash_val=flowlet_hash.get({hdr.ipv4.src_addr,
-		hdr.ipv4.dst_addr,
-		hdr.bth.destination_qp});
-		meta.last_timestamp=flowlet_read_timestamp.execute(meta.hash_val);
-		// meta.dst_port=flowlet_read_port.execute(meta.hash_val);
-	}
 
-	action check_flowlet_timeout(){
-		
-	}
 	
+
+	action forward(PortId_t port){
+		ig_intr_md_for_tm.ucast_egress_port=port;
+	}
+
+	action miss(bit<3> drop_bits) {
+		ig_intr_md_for_dprsr.drop_ctl = drop_bits;
+	}
+
+	table random_forward{
+		key = {
+			hdr.ethernet.dst_addr: exact;
+			meta.port_index: exact;
+		}
+		actions = {
+			forward;
+			@defaultonly miss;
+		}
+
+		const default_action = miss(0x1);
+	}
+
+
 
 	apply {
 		if(hdr.ethernet.ether_type == (bit<16>) ether_type_t.ARP){
@@ -87,17 +101,25 @@ control SwitchIngress(
 
 			if (hdr.bth.isValid()){ // if RDMA 
 				// get current timestamp  
-				meta.current_timestamp=ig_intr_md.ingress_mac_tstamp[15:0];
-				meta.FLOWLET_TIMEOUT=FLOWLET_TIMEOUT;
+				meta.current_time=ig_intr_md.ingress_mac_tstamp[31:0];
 
-				// three tuple to identify a RDMA flow?
-				read_flowlet();
-				meta.time_gap=meta.current_timestamp-meta.last_timestamp;
- 				if(meta.time_gap>=meta.FLOWLET_TIMEOUT){
-					meta.dst_port=8w1;
-				} 
-				// write_flowlet();
-				// flowlet_set_timestamp.execute(meta.hash_val);
+				meta.hash_val=flowlet_hash.get({hdr.ipv4.src_addr,
+				hdr.ipv4.dst_addr,
+				hdr.bth.destination_qp});
+
+				// check current transport link is valid
+				meta.valid=check_valid.execute(meta.hash_val);
+
+				bit<1> new_flowlet=check_new_flowlet.execute(meta.hash_val);
+
+				if(new_flowlet==1){
+					meta.port_index=random_port.get();
+					write_port_index.execute(meta.hash_val);
+				}else{
+					meta.port_index=read_port_index.execute(meta.hash_val)[1:0];
+				}
+
+				random_forward.apply();
 			}
 		}
 	}
@@ -120,31 +142,8 @@ control SwitchEgress(
     inout egress_intrinsic_metadata_for_deparser_t eg_intr_md_for_dprsr,
     inout egress_intrinsic_metadata_for_output_port_t eg_intr_md_for_oport){
 
-	Register<bit<8>,bit<16>>(FLOWLET_TABLE_SIZE) flowlet_table_port;
 
-	RegisterAction<bit<8>,bit<16>,bit<8>>(flowlet_table_port)
-	flowlet_read_port={
-		void apply(inout bit<8> p,out bit<8> out_p){
-			out_p=p;
-		}
-	};
-
-	RegisterAction<bit<8>,bit<16>,void>(flowlet_table_port)
-	flowlet_set_port={
-		void apply(inout bit<8> p){
-			p=meta.dst_port;
-		}
-	};
-
-	action write_flowlet(){
-
-	}
-
-
-	apply{
-		flowlet_set_port.execute(meta.hash_val);
-
-	}
+	apply{}
 
 
 } // End of SwitchEgress

@@ -21,7 +21,7 @@ typedef bit<RANDOM_GEN_BIT_WIDTH> random_gen_bitwidth_t;
 
 typedef bit<48> mac_addr_t;
 typedef bit<32> ipv4_addr_t;
-typedef bit<16> timestamp_t;
+typedef bit<32> timestamp_t;
 
 
 struct port_metadata_t {
@@ -161,17 +161,18 @@ struct header_t {
     ib_deth_h deth;
     ib_aeth_h aeth;
 }
+struct flowlet_t{
+    timestamp_t arrive_time;
+    bit<32> port_index;
+}
 
 
 struct metadata_t {
     /* switch's ID for our virtual topology */
-
     port_metadata_t port_md;    // 8
-    timestamp_t last_timestamp;     // 32
-    timestamp_t current_timestamp;  // 32
-    timestamp_t time_gap;   // 32
-    timestamp_t FLOWLET_TIMEOUT;
-    bit<8> flowlet_id;  // 8
+    timestamp_t current_time;  // 32
+    // timestamp_t time_gap;   // 32
     bit<16> hash_val;   // 16
-    bit<8> dst_port;    // 8
+    bit<2> port_index;
+    bit<1> valid;
 }
