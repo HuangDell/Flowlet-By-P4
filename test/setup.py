@@ -49,9 +49,9 @@ def add_letitflow_forward():
         for i in range(port_begin,port_end+1):
             l2_forward.add_with_forward(dst_addr=dst_addr,port_index=i-port_begin,port=i)
     # Add entries to the l2_forward table
-    generate_port_forward(0x123456789012,0,3)
-    generate_port_forward(0xAABBCCDDEEFF,4,7)
-    generate_port_forward(0x112233445566,8,11)
+    generate_port_forward(0x123456789012,1,4)
+    generate_port_forward(0xAABBCCDDEEFF,5,8)
+    generate_port_forward(0x112233445566,9,12)
 
 
 def add_arp():
