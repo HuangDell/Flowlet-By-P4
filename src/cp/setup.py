@@ -12,8 +12,7 @@ l2_forward_configs=None
 
 if hostname == 'P4-2':
     fp_port_configs = [
-                    ('1/0', '100G', 'NONE', 2),  # 114 0 port --> P4-2 0 port
-                    ('3/0', '100G', 'RS', 2),    # 114 1 port --> P4-2 2 port
+                    ('1/0', '100G', 'NONE', 2),  # P4-2 0 port --> 114 0 port  
                     ('6/0', '100G', 'NONE', 2),  # P4-2 5 port --> P4-1 5 port
                     ]
     l2_forward_configs =[
@@ -24,7 +23,7 @@ if hostname == 'P4-2':
 elif hostname == 'P4-1':
     fp_port_configs = [
                     ('6/0', '100G', 'NONE', 2),  # P4-1 5 port --> P4-2 5 port
-                    ('7/0', '100G', 'NONE', 2),  # 112 0 port --> P4-1 6 port
+                    ('7/0', '100G', 'NONE', 2),  # P4-1 6 port --> 112 0 port 
                     ]
 
     l2_forward_configs =[
@@ -75,6 +74,17 @@ def add_l2_forward(forward_configs):
         else:
             generate_random_port_forward(*config)
 
+def add_exact_forward(forward_configs):
+    l2_forward = bfrt.let_it_flow.pipe.SwitchIngress.exact_forward
+    for config in forward_configs:
+        if config[1]==config[2]:     # exact l2 forward
+            l2_forward.add_with_forward(dst_addr=config[0],port=config[1])
+    
+
+
+
+
+
 
 def add_arp():
     # ARP
@@ -85,7 +95,9 @@ def add_arp():
 
 for port_config in fp_port_configs:
     add_port_config(port_config)
+
 add_l2_forward(l2_forward_configs)
+# add_exact_forward(l2_forward_configs)
 print('setup over')
 
 

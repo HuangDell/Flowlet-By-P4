@@ -86,7 +86,18 @@ control SwitchIngress(
 			forward;
 			@defaultonly miss;
 		}
+		const default_action = miss(0x1);
+	}
 
+	table exact_forward {
+		key = {
+			hdr.ethernet.dst_addr: exact;
+		}
+
+		actions = {
+			forward;
+			@defaultonly miss;
+		}
 		const default_action = miss(0x1);
 	}
 
@@ -119,6 +130,8 @@ control SwitchIngress(
 				}
 
 				random_forward.apply();
+			}else{
+				exact_forward.apply();
 			}
 		}
 	}
