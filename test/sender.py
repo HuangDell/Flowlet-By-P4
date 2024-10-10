@@ -23,7 +23,10 @@ class RoCEPayload(Packet):
     ]
 
 # 定义三个不同的目标MAC地址
-dst_macs = ["12:34:56:78:90:12", "AA:BB:CC:DD:EE:FF", "11:22:33:44:55:66"]
+dst_macs = ["12:34:56:78:90:12", 
+            # "AA:BB:CC:DD:EE:FF", 
+            # "11:22:33:44:55:66"
+            ]
 
 # 源MAC地址和IP地址
 src_mac = "00:11:22:33:44:55"
@@ -36,7 +39,7 @@ udp = UDP(dport=4791, sport=12345)
 bth = BTH(opcode=0x04, dest_qp=0x1)
 
 # 发送10个报文
-for i in range(30):
+for i in range(3):
     # 选择目标MAC地址 (轮换使用)
     dst_mac = dst_macs[i % len(dst_macs)]
     
@@ -51,7 +54,6 @@ for i in range(30):
     
     # 显示包的内容
     print(f"\nSending packet {i+1} to {dst_mac}:")
-    packet.show()
     
     # 发送包
     sendp(packet, iface="veth0", verbose=False)

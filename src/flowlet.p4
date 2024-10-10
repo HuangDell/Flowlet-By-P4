@@ -11,7 +11,7 @@
 
 const int MCAST_GRP_ID = 1; // for ARP
 const bit<32> FLOWLET_TABLE_SIZE=32w256;	// a table for different flowlet 2^16
-const timestamp_t FLOWLET_TIMEOUT = 32w20000000;	// 20ms
+const timestamp_t FLOWLET_TIMEOUT = 32w80000000>>8;	// 80ms
 const int MAX_PORTS = 256;
 
 
@@ -101,9 +101,9 @@ control SwitchIngress(
 
 			if (hdr.bth.isValid()){ // if RDMA 
 				// get current timestamp  
-				meta.current_time=ig_intr_md.ingress_mac_tstamp[31:0];
+				meta.current_time=ig_intr_md.ingress_mac_tstamp[39:8];
+				meta.hash_val=flowlet_hash.get({hdr.ethernet.src_addr,hdr.ethernet.dst_addr,hdr.bth.destination_qp});
 
-				meta.hash_val=flowlet_hash.get({hdr.ipv4.src_addr,hdr.ipv4.dst_addr,hdr.bth.destination_qp});
 
 
 				// check current transport link is valid
