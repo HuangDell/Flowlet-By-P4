@@ -95,7 +95,7 @@ for port_config in fp_port_configs:
 
 add_l2_forward(l2_forward_configs)
 add_exact_forward(l2_forward_configs)
-add_arp(active_dev_ports)
+# add_arp(active_dev_ports)
 print('setup over')
 
 
