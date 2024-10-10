@@ -16,8 +16,8 @@ if hostname == 'P4-2':
                     ('5/0', '100G', 'NONE', 2),  # P4-2 5 port --> P4-1 5 port
                     ]
     l2_forward_configs =[
-        (0xe8ebd358a0cc,0,0),   # to 114 host
-        (0xe8ebd358a0bc,0,0)    # to 112 via P4-1
+        (0xe8ebd358a0cc,132,132),   # to 114 host
+        (0xe8ebd358a0bc,164,164)    # to 112 via P4-1
     ]
 
 elif hostname == 'P4-1':
@@ -27,9 +27,8 @@ elif hostname == 'P4-1':
                     ]
 
     l2_forward_configs =[
-        (0x123456789012,0,0),
+        (0xe8ebd358a0bc,168,168),
     ]
-
 
 
 def add_port_config(port_config):
@@ -58,7 +57,6 @@ def add_port_config(port_config):
 
 
 
-
 def add_l2_forward(forward_configs):
     l2_forward = bfrt.let_it_flow.pipe.SwitchIngress.random_forward
     def generate_random_port_forward(dst_addr,port_begin,port_end):
@@ -81,11 +79,6 @@ def add_exact_forward(forward_configs):
             l2_forward.add_with_forward(dst_addr=config[0],port=config[1])
     
 
-
-
-
-
-
 def add_arp():
     # ARP
     bfrt.pre.node.add(MULTICAST_NODE_ID=0, MULTICAST_RID=0, MULTICAST_LAG_ID=[], DEV_PORT=active_dev_ports)
@@ -97,7 +90,7 @@ for port_config in fp_port_configs:
     add_port_config(port_config)
 
 add_l2_forward(l2_forward_configs)
-# add_exact_forward(l2_forward_configs)
+add_exact_forward(l2_forward_configs)
 print('setup over')
 
 
