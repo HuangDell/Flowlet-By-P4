@@ -4,13 +4,34 @@ import os
 import time
 import math
 
+hostname = socket.gethostname()
+print("Hostname: {}".format(hostname))
 
-fp_port_configs = [
-                ('1/0', '40G', 'NONE', 2),  # lumos ens2f1
-                ('2/0', '40G', 'NONE', 2),  # hajime enp6s0f1
-                ('3/0', '100G', 'RS', 2),  # monitoring patronus ens1f1
-                ('4/0', '40G', 'NONE', 2),  # hajime enp6s0f1
-                ]
+fp_port_configs=None
+l2_forward_configs=None
+
+if hostname == 'P4-2':
+    fp_port_configs = [
+                    ('1/0', '100G', 'NONE', 2),  # 114 0 port --> P4-2 0 port
+                    ('3/0', '100G', 'RS', 2),    # 114 1 port --> P4-2 2 port
+                    ('6/0', '100G', 'NONE', 2),  # P4-2 5 port --> P4-1 5 port
+                    ]
+    l2_forward_configs =[
+        (0xe8ebd358a0cc,0,0),   # to 114 host
+        (0xe8ebd358a0bc,0,0)    # to 112 via P4-1
+    ]
+
+elif hostname == 'P4-1':
+    fp_port_configs = [
+                    ('6/0', '100G', 'NONE', 2),  # P4-1 5 port --> P4-2 5 port
+                    ('7/0', '100G', 'NONE', 2),  # 112 0 port --> P4-1 6 port
+                    ]
+
+    l2_forward_configs =[
+        (0x123456789012,0,0),
+    ]
+
+
 
 def add_port_config(port_config):
     speed_dict = {'10G':'BF_SPEED_10G', '25G':'BF_SPEED_25G', '40G':'BF_SPEED_40G','50G':'BF_SPEED_50G', '100G':'BF_SPEED_100G'}
@@ -36,32 +57,40 @@ def add_port_config(port_config):
         dp = bfrt.port.port_hdl_info.get(CONN_ID=conf_port, CHNL_ID=conf_lane, print_ents=False).data[b'$DEV_PORT']
         bfrt.port.port.add(DEV_PORT=dp, SPEED=conf_speed, FEC=conf_fec, AUTO_NEGOTIATION=conf_an, PORT_ENABLE=True)
 
-for config in fp_port_configs:
-    add_port_config(config)
 
 
-l2_forward = bfrt.dcqcn_buffering_test.pipe.SwitchIngress.l2_forward
+
+def add_l2_forward(forward_configs):
+    l2_forward = bfrt.let_it_flow.pipe.SwitchIngress.random_forward
+    def generate_random_port_forward(dst_addr,port_begin,port_end):
+        for i in range(port_begin,port_end+1):
+            l2_forward.add_with_forward(dst_addr=dst_addr,port_index=i-port_begin,port=i)
+    def generate_exact_port_forward(dst_addr,exact_port):
+        for i in range(4):
+            l2_forward.add_with_forward(dst_addr=dst_addr,port_index=i,port=exact_port)
+    
+    for config in forward_configs:
+        if config[1]==config[2]:     # exact l2 forward
+            generate_exact_port_forward(config[0],config[1])
+        else:
+            generate_random_port_forward(*config)
 
 
-# Add entries to the l2_forward table
-l2_forward.add_with_forward(dst_addr=0xe8ebd358a0cc, port_index=0, port=132) # to receiver (DATA) 114
-l2_forward.add_with_forward(dst_addr=0xe8ebd358a02c, port_index=0, port=140) # to receiver (ACK) 116
-# l2_forward.add_with_forward(dst_addr=0xe8ebd358a0bc, switch_id=0, port=156) # to sender 112
-
-# XXX monitoring entry to patronus ens1f1 (dp 29/3)
-l2_forward.add_with_forward(dst_addr=0xe8ebd358a0cd, port_index=0, port=148) #  114
-
-# #  Pktgen pkt's forwarding from sw2 to sw3
-# l2_forward.add_with_forward(dst_addr=RECEIVER_SW_ADDR, switch_id=2, port=172)
+def add_arp():
+    # ARP
+    bfrt.pre.node.add(MULTICAST_NODE_ID=0, MULTICAST_RID=0, MULTICAST_LAG_ID=[], DEV_PORT=active_dev_ports)
+    bfrt.pre.mgid.add(MGID=1, MULTICAST_NODE_ID=[0], MULTICAST_NODE_L1_XID_VALID=[False], MULTICAST_NODE_L1_XID=[0])
 
 
-# Setup ARP broadcast for the active dev ports
-active_dev_ports = []
 
-if hostname == 'P4-2':
-    active_dev_ports = [132, 140, 148,156]
+for port_config in fp_port_configs:
+    add_port_config(port_config)
+add_l2_forward(l2_forward_configs)
+print('setup over')
 
-# ARP
-bfrt.pre.node.add(MULTICAST_NODE_ID=0, MULTICAST_RID=0, MULTICAST_LAG_ID=[], DEV_PORT=active_dev_ports)
-bfrt.pre.mgid.add(MGID=1, MULTICAST_NODE_ID=[0], MULTICAST_NODE_L1_XID_VALID=[False], MULTICAST_NODE_L1_XID=[0])
+
+
+
+
+
 
