@@ -9,6 +9,7 @@ print("Hostname: {}".format(hostname))
 
 fp_port_configs=None
 l2_forward_configs=None
+active_dev_ports = None
 
 if hostname == 'P4-2':
     fp_port_configs = [
@@ -19,6 +20,7 @@ if hostname == 'P4-2':
         (0xe8ebd358a0cc,132,132),   # to 114 host
         (0xe8ebd358a0bc,164,164)    # to 112 via P4-1
     ]
+    active_dev_ports = [132,164]
 
 elif hostname == 'P4-1':
     fp_port_configs = [
@@ -27,8 +29,11 @@ elif hostname == 'P4-1':
                     ]
 
     l2_forward_configs =[
-        (0xe8ebd358a0bc,168,168),
+        (0xe8ebd358a0cc,160,160),   # to 114 host via P4-2
+        (0xe8ebd358a0bc,168,168),   # to 112 host
     ]
+    active_dev_ports = [132,168]
+# Setup ARP broadcast for the active dev ports
 
 
 def add_port_config(port_config):
@@ -79,9 +84,9 @@ def add_exact_forward(forward_configs):
             l2_forward.add_with_forward(dst_addr=config[0],port=config[1])
     
 
-def add_arp():
+def add_arp(dev_ports):
     # ARP
-    bfrt.pre.node.add(MULTICAST_NODE_ID=0, MULTICAST_RID=0, MULTICAST_LAG_ID=[], DEV_PORT=active_dev_ports)
+    bfrt.pre.node.add(MULTICAST_NODE_ID=0, MULTICAST_RID=0, MULTICAST_LAG_ID=[], DEV_PORT=dev_ports)
     bfrt.pre.mgid.add(MGID=1, MULTICAST_NODE_ID=[0], MULTICAST_NODE_L1_XID_VALID=[False], MULTICAST_NODE_L1_XID=[0])
 
 
@@ -91,6 +96,7 @@ for port_config in fp_port_configs:
 
 add_l2_forward(l2_forward_configs)
 add_exact_forward(l2_forward_configs)
+add_arp(active_dev_ports)
 print('setup over')
 
 
