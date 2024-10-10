@@ -32,7 +32,7 @@ elif hostname == 'P4-1':
         (0xe8ebd358a0cc,160,160),   # to 114 host via P4-2
         (0xe8ebd358a0bc,168,168),   # to 112 host
     ]
-    active_dev_ports = [132,168]
+    active_dev_ports = [160,168]
 # Setup ARP broadcast for the active dev ports
 
 
