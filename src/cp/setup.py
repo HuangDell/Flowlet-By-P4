@@ -20,7 +20,7 @@ if hostname == 'P4-2':
         (0xe8ebd358a0cc,132,132),   # to 114 host
         (0xe8ebd358a0bc,164,164)    # to 112 via P4-1
     ]
-    active_dev_ports = [132]
+    active_dev_ports = [164]
 
 elif hostname == 'P4-1':
     fp_port_configs = [
@@ -32,7 +32,7 @@ elif hostname == 'P4-1':
         (0xe8ebd358a0cc,160,160),   # to 114 host via P4-2
         (0xe8ebd358a0bc,168,168),   # to 112 host
     ]
-    active_dev_ports = [168]
+    active_dev_ports = [160]
 
 
 def add_port_config(port_config):
