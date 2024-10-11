@@ -29,7 +29,7 @@ elif hostname == 'P4-1':
                     ]
 
     l2_forward_configs =[
-        (0xe8ebd358a0cc,160,160),   # to 114 host via P4-2
+        (0xe8ebd358a0cc,160,163),   # to 114 host via P4-2
         (0xe8ebd358a0bc,168,168),   # to 112 host
     ]
     active_dev_ports = [160]
@@ -79,7 +79,6 @@ def add_l2_forward(forward_configs):
 def add_exact_forward(forward_configs):
     l2_forward = bfrt.let_it_flow.pipe.SwitchIngress.exact_forward
     for config in forward_configs:
-        if config[1]==config[2]:     # exact l2 forward
             l2_forward.add_with_forward(dst_addr=config[0],port=config[1])
     
 
