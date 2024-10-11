@@ -14,17 +14,17 @@ active_dev_ports = None
 if hostname == 'P4-2':
     fp_port_configs = [
                     ('1/0', '100G', 'NONE', 2),  # P4-2 1 port --> 114 0 port  
-                    ('5/0', '100G', 'NONE', 2),  # P4-2 5 port --> P4-1 5 port
+                    ('5/-', '25G', 'NONE', 2),  # P4-2 5 port --> P4-1 5 port
                     ]
     l2_forward_configs =[
         (0xe8ebd358a0cc,132,132),   # to 114 host
-        (0xe8ebd358a0bc,164,164)    # to 112 via P4-1
+        (0xe8ebd358a0bc,164,167)    # to 112 via P4-1
     ]
     active_dev_ports = [164]
 
 elif hostname == 'P4-1':
     fp_port_configs = [
-                    ('5/0', '100G', 'NONE', 2),  # P4-1 5 port --> P4-2 5 port
+                    ('5/-', '25G', 'NONE', 2),  # P4-1 5 port --> P4-2 5 port
                     ('6/0', '100G', 'NONE', 2),  # P4-1 6 port --> 112 0 port 
                     ]
 
