@@ -64,7 +64,7 @@ control SwitchIngress(
 			data=1;
 		}
 	};
-	
+
 	action forward(PortId_t port){
 		ig_intr_md_for_tm.ucast_egress_port=port;
 	}
@@ -105,28 +105,25 @@ control SwitchIngress(
 			ig_intr_md_for_tm.mcast_grp_a = MCAST_GRP_ID;
 			ig_intr_md_for_tm.rid = 0;
 		} else { // non-arp packet	
-
-			if (hdr.bth.isValid()){ // if RDMA 
-				// get current timestamp  
-				meta.current_time=ig_intr_md.ingress_mac_tstamp[39:8];
-				meta.hash_val=flowlet_hash.get({hdr.ethernet.src_addr,hdr.ethernet.dst_addr,hdr.bth.destination_qp});
+			// get current timestamp  
+			meta.current_time=ig_intr_md.ingress_mac_tstamp[39:8];
+			meta.hash_val=flowlet_hash.get({hdr.ethernet.src_addr,hdr.ethernet.dst_addr,hdr.bth.destination_qp});
 
 
 
-				// check current transport link is valid
-				meta.valid=check_valid.execute(meta.hash_val);
+			// check current transport link is valid
+			meta.valid=check_valid.execute(meta.hash_val);
 
-				bit<1> new_flowlet=check_new_flowlet.execute(meta.hash_val);
+			bit<1> new_flowlet=check_new_flowlet.execute(meta.hash_val);
 
-				if(new_flowlet==1){
-					meta.port_index=random_port.get();
-					write_port_index.execute(meta.hash_val);
-				}else{
-					meta.port_index=read_port_index.execute(meta.hash_val)[1:0];
-				}
-
-				random_forward.apply();
+			if(new_flowlet==1){
+				meta.port_index=random_port.get();
+				write_port_index.execute(meta.hash_val);
+			}else{
+				meta.port_index=read_port_index.execute(meta.hash_val)[1:0];
 			}
+
+			random_forward.apply();
 		}
 	}
 
