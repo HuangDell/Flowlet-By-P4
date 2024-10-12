@@ -64,11 +64,7 @@ control SwitchIngress(
 			data=1;
 		}
 	};
-
-
-
 	
-
 	action forward(PortId_t port){
 		ig_intr_md_for_tm.ucast_egress_port=port;
 	}
@@ -89,17 +85,17 @@ control SwitchIngress(
 		const default_action = miss(0x1);
 	}
 
-	table exact_forward {
-		key = {
-			hdr.ethernet.dst_addr: exact;
-		}
+	// table exact_forward {
+	// 	key = {
+	// 		hdr.ethernet.dst_addr: exact;
+	// 	}
 
-		actions = {
-			forward;
-			@defaultonly miss;
-		}
-		const default_action = miss(0x1);
-	}
+	// 	actions = {
+	// 		forward;
+	// 		@defaultonly miss;
+	// 	}
+	// 	const default_action = miss(0x1);
+	// }
 
 
 
@@ -130,8 +126,6 @@ control SwitchIngress(
 				}
 
 				random_forward.apply();
-			}else{
-				exact_forward.apply();
 			}
 		}
 	}
