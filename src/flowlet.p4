@@ -11,7 +11,7 @@
 
 const int MCAST_GRP_ID = 1; // for ARP
 const bit<32> FLOWLET_TABLE_SIZE=32w256;	// a table for different flowlet 2^16
-const timestamp_t FLOWLET_TIMEOUT = 32w10000>>8;	// 10us
+const timestamp_t FLOWLET_TIMEOUT = 32w7500>>8;	// 7.5us
 const int MAX_PORTS = 256;
 
 
