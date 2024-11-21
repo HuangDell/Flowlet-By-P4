@@ -143,6 +143,15 @@ header ib_aeth_h {
 header bridged_meta_h {
 }
 
+const bit<3> IG_MIRROR_TYPE_1 = 1; // corresponds to ig_mirror1_h
+
+header ig_mirror1_h {
+    bit<48> ingress_mac_timestamp;
+    bit<8> opcode;
+    bit<8> mirrored;
+    bit<8> last_ack;
+    bit<32> rdma_seqnum;
+}
 
 struct header_t {
     /* custom bridged info, needs to be deparsed from ig to eg */
@@ -162,10 +171,6 @@ struct header_t {
     ib_deth_h deth;
     ib_aeth_h aeth;
 }
-struct flowlet_t{
-    timestamp_t arrive_time;
-    bit<32> port_index;
-}
 
 
 struct metadata_t {
@@ -176,4 +181,6 @@ struct metadata_t {
     hash_t hash_val;   // 16
     bit<2> port_index;
     bit<1> valid;
+    ig_mirror1_h ig_mirror1;
+    MirrorId_t mirror_session;
 }

@@ -10,7 +10,8 @@
 #include "includes/parser.p4"
 
 const int MCAST_GRP_ID = 1; // for ARP
-const bit<32> FLOWLET_TABLE_SIZE=32w256;	// a table for different flowlet 2^16
+const bit<10> MIRROR_SESSION_RDMA_ID_IG = 10w777;	// for mirror id
+const bit<32> FLOWLET_TABLE_SIZE=32w1<<16;	// a table for different flowlet 2^16
 const timestamp_t FLOWLET_TIMEOUT = 32w7500>>8;	// 7.5us
 const int MAX_PORTS = 256;
 
@@ -25,6 +26,7 @@ control SwitchIngress(
 
     Hash<hash_t>(HashAlgorithm_t.CRC8) flowlet_hash;
 
+	// flowlet table
 	Register<timestamp_t,hash_t>(FLOWLET_TABLE_SIZE) flowlet_time;
 	Register<bit<8>,hash_t>(FLOWLET_TABLE_SIZE) flowlet_port_index;
 	Register<bit<1>,hash_t>(FLOWLET_TABLE_SIZE) flowlet_valid;
@@ -65,6 +67,8 @@ control SwitchIngress(
 		}
 	};
 
+
+
 	action forward(PortId_t port){
 		ig_intr_md_for_tm.ucast_egress_port=port;
 	}
@@ -84,6 +88,14 @@ control SwitchIngress(
 		}
 		const default_action = miss(0x1);
 	}
+
+	action mirror_to_collector(bit<10> ing_mir_ses){
+        ig_intr_md_for_dprsr.mirror_type = IG_MIRROR_TYPE_1;
+        meta.mirror_session = ing_mir_ses;
+		meta.ig_mirror1.ingress_mac_timestamp = ig_intr_md.ingress_mac_tstamp;
+		meta.ig_mirror1.opcode = hdr.bth.opcode;
+		meta.ig_mirror1.mirrored = (bit<8>)IG_MIRROR_TYPE_1;
+    }
 
 	// table exact_forward {
 	// 	key = {
@@ -124,6 +136,12 @@ control SwitchIngress(
 			}
 
 			random_forward.apply();
+
+			if (hdr.bth.isValid()){ // if RDMA
+				#ifdef IG_MIRRORING_ENABLED
+				mirror_to_collector(MIRROR_SESSION_RDMA_ID_IG); // ig_mirror all RDMA packets
+				#endif
+			}
 		}
 	}
 
@@ -146,7 +164,18 @@ control SwitchEgress(
     inout egress_intrinsic_metadata_for_output_port_t eg_intr_md_for_oport){
 
 
-	apply{}
+	apply{
+		#ifdef IG_MIRRORING_ENABLED
+		if (meta.ig_mirror1.mirrored == (bit<8>)IG_MIRROR_TYPE_1) {
+			/* Timestamp -> MAC Src Address*/
+			hdr.ethernet.src_addr = meta.ig_mirror1.ingress_mac_timestamp; // 48 bits
+			/* Sequence Number -> MAC Dst Address */
+			hdr.ethernet.dst_addr = 48w0xe8ebd358a0bc;
+        	hdr.udp.src_port=16w4791;
+		}
+		#endif
+
+	}
 
 
 } // End of SwitchEgress

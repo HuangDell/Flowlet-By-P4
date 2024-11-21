@@ -4,9 +4,12 @@ import os
 import time
 import math
 
+# mirroring interfaces for P4-2
+INFO_DEV_PORT_PATRONUS_ENS1F1 = 156
+MIRROR_SESSION_RDMA_SNIFF_IG = 777 # mirroring's session id for sniffing RDMA packets for IG_MIRROR 
+
 hostname = socket.gethostname()
 print("Hostname: {}".format(hostname))
-
 fp_port_configs=None
 l2_forward_configs=None
 active_dev_ports = None
@@ -14,13 +17,13 @@ active_dev_ports = None
 if hostname == 'P4-2':
     fp_port_configs = [
                     ('1/0', '100G', 'NONE', 2),  # P4-2 1 port --> 114 0 port  
+                    ('4/0', '100G', 'RS', 2),   # P4-2 4 port --> 112 0 port for mirror
                     ('5/-', '25G', 'NONE', 2),  # P4-2 5 port --> P4-1 5 port
                     ]
     l2_forward_configs =[
         (0xe8ebd358a0cc,132,132),   # to 114 host
         (0xe8ebd358a0bc,164,167)    # to 112 via P4-1
     ]
-    active_dev_ports = [164]
 
 elif hostname == 'P4-1':
     fp_port_configs = [
@@ -32,7 +35,6 @@ elif hostname == 'P4-1':
         (0xe8ebd358a0cc,160,163),   # to 114 host via P4-2
         (0xe8ebd358a0bc,168,168),   # to 112 host
     ]
-    active_dev_ports = [160]
 
 
 def add_port_config(port_config):
@@ -89,8 +91,13 @@ def add_arp(dev_ports):
 
 
 
+
 for port_config in fp_port_configs:
     add_port_config(port_config)
+
+
+if hostname == "P4-2":
+    bfrt.mirror.cfg.add_with_normal(sid=MIRROR_SESSION_RDMA_SNIFF_IG, direction='INGRESS', session_enable=True, ucast_egress_port=INFO_DEV_PORT_PATRONUS_ENS1F1, ucast_egress_port_valid=1, max_pkt_len=48)
 
 add_l2_forward(l2_forward_configs)
 # add_exact_forward(l2_forward_configs)
