@@ -21,8 +21,9 @@ if hostname == 'P4-2':
                     ('5/-', '25G', 'NONE', 2),  # P4-2 5 port --> P4-1 5 port
                     ]
     l2_forward_configs =[
-        (0xe8ebd358a0cc,132,132),   # to 114 host
-        (0xe8ebd358a0bc,164,167)    # to 112 via P4-1
+        (0xe8ebd358a02c,140,140),   # to 116 host
+        (0xe8ebd358a0bc,156,156),    # to 112 host for mirroring
+        (0xe8ebd358a0cc,164,167),   # to 114 host via P4-1
     ]
 
 elif hostname == 'P4-1':
@@ -32,8 +33,9 @@ elif hostname == 'P4-1':
                     ]
 
     l2_forward_configs =[
-        (0xe8ebd358a0cc,160,163),   # to 114 host via P4-2
-        (0xe8ebd358a0bc,168,168),   # to 112 host
+        (0xe8ebd358a02c,160,163),   # to 116 host via P4-2
+        (0xe8ebd358a0cc,128,128),   # to 114 host 
+
     ]
 
 
