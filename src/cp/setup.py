@@ -24,6 +24,7 @@ if hostname == 'P4-2':
         (0xe8ebd358a02c,140,140),   # to 116 host
         (0xe8ebd358a0bc,156,156),    # to 112 host for mirroring
         (0xe8ebd358a0cd,164,167),   # to 114 host via P4-1
+        (0x0180c2000001,140,140),   # PFC to 116 host
     ]
 
 elif hostname == 'P4-1':

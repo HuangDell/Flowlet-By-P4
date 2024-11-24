@@ -4,7 +4,8 @@
 
 enum bit<16> ether_type_t {
     IPV4 = 0x0800,
-    ARP  = 0x0806
+    ARP  = 0x0806,
+    PFC  = 0x8808
 }
 
 enum bit<8> ipv4_proto_t {
@@ -49,9 +50,15 @@ parser SwitchIngressParser(
 		transition select(hdr.ethernet.ether_type){
 			(bit<16>) ether_type_t.IPV4: parse_ipv4;
 			(bit<16>) ether_type_t.ARP: parse_arp;
+            (bit<16>) ether_type_t.PFC: parse_pfc;
 			default: accept;
 		}
 	}
+
+    state parse_pfc{
+		pkt.extract(hdr.pfc);
+        transition accept;
+    }
 
 	state parse_ipv4 {
 		pkt.extract(hdr.ipv4);
@@ -127,19 +134,21 @@ control SwitchIngressDeparser(
     Mirror() mirror;
 
     apply {
-        hdr.ipv4.hdr_checksum = ipv4_checksum.update({
-            hdr.ipv4.version,
-            hdr.ipv4.ihl,
-            hdr.ipv4.dscp,
-            hdr.ipv4.ecn,
-            hdr.ipv4.total_len,
-            hdr.ipv4.identification,
-            hdr.ipv4.flags,
-            hdr.ipv4.frag_offset,
-            hdr.ipv4.ttl,
-            hdr.ipv4.protocol,
-            hdr.ipv4.src_addr,
-            hdr.ipv4.dst_addr});
+        if(hdr.ipv4.isValid()){
+            hdr.ipv4.hdr_checksum = ipv4_checksum.update({
+                hdr.ipv4.version,
+                hdr.ipv4.ihl,
+                hdr.ipv4.dscp,
+                hdr.ipv4.ecn,
+                hdr.ipv4.total_len,
+                hdr.ipv4.identification,
+                hdr.ipv4.flags,
+                hdr.ipv4.frag_offset,
+                hdr.ipv4.ttl,
+                hdr.ipv4.protocol,
+                hdr.ipv4.src_addr,
+                hdr.ipv4.dst_addr});
+        }
 
         #ifdef IG_MIRRORING_ENABLED
         if(ig_dprsr_md.mirror_type == IG_MIRROR_TYPE_1) {      
@@ -276,19 +285,21 @@ control SwitchEgressDeparser(
     Checksum() ipv4_checksum;
     
 	apply{
-        hdr.ipv4.hdr_checksum = ipv4_checksum.update({
-            hdr.ipv4.version,
-            hdr.ipv4.ihl,
-            hdr.ipv4.dscp,
-            hdr.ipv4.ecn,
-            hdr.ipv4.total_len,
-            hdr.ipv4.identification,
-            hdr.ipv4.flags,
-            hdr.ipv4.frag_offset,
-            hdr.ipv4.ttl,
-            hdr.ipv4.protocol,
-            hdr.ipv4.src_addr,
-            hdr.ipv4.dst_addr});
+        if(hdr.ipv4.isValid()){
+            hdr.ipv4.hdr_checksum = ipv4_checksum.update({
+                hdr.ipv4.version,
+                hdr.ipv4.ihl,
+                hdr.ipv4.dscp,
+                hdr.ipv4.ecn,
+                hdr.ipv4.total_len,
+                hdr.ipv4.identification,
+                hdr.ipv4.flags,
+                hdr.ipv4.frag_offset,
+                hdr.ipv4.ttl,
+                hdr.ipv4.protocol,
+                hdr.ipv4.src_addr,
+                hdr.ipv4.dst_addr});
+        }
         pkt.emit(hdr);
     }
 }

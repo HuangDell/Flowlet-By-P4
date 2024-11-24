@@ -35,6 +35,20 @@ header ethernet_h {
     bit<16> ether_type;
 }
 
+header pfc_h {
+    bit<16> opcode;
+    bit<16> flags;
+    bit<16> c0;
+    bit<16> c1;
+    bit<16> c2;
+    bit<16> c3;
+    bit<16> c4;
+    bit<16> c5;
+    bit<16> c6;
+    bit<16> c7;
+    bit<16> pad;
+}
+
 header arp_h {
     bit<16> htype;
     bit<16> ptype;
@@ -159,6 +173,7 @@ struct header_t {
 
     /* Normal headers */
     ethernet_h ethernet;
+    pfc_h pfc;
     ipv4_h ipv4;
     arp_h arp;
     tcp_h tcp;
