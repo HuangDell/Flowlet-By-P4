@@ -11,7 +11,7 @@
 
 const int MCAST_GRP_ID = 1; // for ARP
 const bit<10> MIRROR_SESSION_RDMA_ID_IG = 10w777;	// for mirror id
-const bit<32> FLOWLET_TABLE_SIZE=32w1<<16;	// a table for different flowlet 2^16
+const bit<32> FLOWLET_TABLE_SIZE=32w1<<8;	// a table for different flowlet 2^8
 const timestamp_t FLOWLET_TIMEOUT = 32w7500>>8;	// 7.5us
 const int MAX_PORTS = 256;
 
