@@ -3,6 +3,7 @@ import sys
 import os
 import time
 import math
+# this setup file for pure forward
 
 # mirroring interfaces for P4-2
 INFO_DEV_PORT_PATRONUS_ENS1F1 = 156
@@ -18,23 +19,23 @@ if hostname == 'P4-2':
     fp_port_configs = [
                     ('2/0', '100G', 'NONE', 2),  # P4-2 2 port --> 116 1 port  
                     ('4/0', '100G', 'RS', 2),   # P4-2 4 port --> 112 1 port for mirror
-                    ('5/-', '25G', 'NONE', 2),  # P4-2 5 port --> P4-1 5 port
+                    ('5/0', '100G', 'NONE', 2),  # P4-2 5 port --> P4-1 5 port
                     ]
     l2_forward_configs =[
         (0xe8ebd358a02c,140,140),   # to 116 host
         (0xe8ebd358a0bc,156,156),    # to 112 host for mirroring
-        (0xe8ebd358a0cd,164,167),   # to 114 host via P4-1
+        (0xe8ebd358a0cd,164,164),   # to 114 host via P4-1
         (0x0180c2000001,140,140),   # PFC to 116 host
     ]
 
 elif hostname == 'P4-1':
     fp_port_configs = [
                     ('1/0', '100G', 'NONE', 2),  # P4-1 1 port --> 114 2 port 
-                    ('5/-', '25G', 'NONE', 2),  # P4-1 5 port --> P4-2 5 port
+                    ('5/0', '100G', 'NONE', 2),  # P4-1 5 port --> P4-2 5 port
                     ]
 
     l2_forward_configs =[
-        (0xe8ebd358a02c,160,163),   # to 116 host via P4-2
+        (0xe8ebd358a02c,160,160),   # to 116 host via P4-2
         (0xe8ebd358a0cd,128,128),   # to 114 host 
 
     ]
