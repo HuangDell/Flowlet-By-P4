@@ -19,7 +19,7 @@ if hostname == 'P4-2':
     fp_port_configs = [
                     ('2/0', '100G', 'NONE', 2),  # P4-2 2 port --> 116 1 port  
                     ('4/0', '100G', 'RS', 2),   # P4-2 4 port --> 112 1 port for mirror
-                    ('5/0', '100G', 'NONE', 2),  # P4-2 5 port --> P4-1 5 port
+                    ('5/-', '25G', 'NONE', 2),  # P4-2 5 port --> P4-1 5 port
                     ]
     l2_forward_configs =[
         (0xe8ebd358a02c,140,140),   # to 116 host
@@ -31,7 +31,7 @@ if hostname == 'P4-2':
 elif hostname == 'P4-1':
     fp_port_configs = [
                     ('1/0', '100G', 'NONE', 2),  # P4-1 1 port --> 114 2 port 
-                    ('5/0', '100G', 'NONE', 2),  # P4-1 5 port --> P4-2 5 port
+                    ('5/-', '25G', 'NONE', 2),  # P4-1 5 port --> P4-2 5 port
                     ]
 
     l2_forward_configs =[
