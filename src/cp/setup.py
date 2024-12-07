@@ -100,7 +100,7 @@ for port_config in fp_port_configs:
 
 
 if hostname == "P4-2":
-    bfrt.mirror.cfg.add_with_normal(sid=MIRROR_SESSION_RDMA_SNIFF_IG, direction='INGRESS', session_enable=True, ucast_egress_port=INFO_DEV_PORT_PATRONUS_ENS1F1, ucast_egress_port_valid=1, max_pkt_len=65535)
+    bfrt.mirror.cfg.add_with_normal(sid=MIRROR_SESSION_RDMA_SNIFF_IG, direction='INGRESS', session_enable=True, ucast_egress_port=INFO_DEV_PORT_PATRONUS_ENS1F1, ucast_egress_port_valid=1, max_pkt_len=48)
 
 add_l2_forward(l2_forward_configs)
 # add_exact_forward(l2_forward_configs)
