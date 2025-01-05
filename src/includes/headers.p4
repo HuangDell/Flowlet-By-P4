@@ -194,6 +194,7 @@ struct metadata_t {
     timestamp_t current_time;  // 32
     // timestamp_t time_gap;   // 32
     hash_t hash_val;   // 16
+    bit<1> new_flowlet;
     bit<2> port_index;
     bit<1> valid;
     ig_mirror1_h ig_mirror1;

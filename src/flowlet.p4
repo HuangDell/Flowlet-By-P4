@@ -31,6 +31,8 @@ control SwitchIngress(
 	Register<bit<8>,hash_t>(FLOWLET_TABLE_SIZE) flowlet_port_index;
 	Register<bit<1>,hash_t>(FLOWLET_TABLE_SIZE) flowlet_valid;
 
+
+
 	Random<bit<2>>() random_port;
 
 	RegisterAction<timestamp_t,hash_t,bit<1>>(flowlet_time)
@@ -126,9 +128,9 @@ control SwitchIngress(
 			// check current transport link is valid
 			meta.valid=check_valid.execute(meta.hash_val);
 
-			bit<1> new_flowlet=check_new_flowlet.execute(meta.hash_val);
+			meta.new_flowlet=check_new_flowlet.execute(meta.hash_val);
 
-			if(new_flowlet==1){
+			if(meta.new_flowlet==1){
 				meta.port_index=random_port.get();
 				write_port_index.execute(meta.hash_val);
 			}else{
@@ -139,6 +141,7 @@ control SwitchIngress(
 
 			if (hdr.bth.isValid()){ // if RDMA
 				#ifdef IG_MIRRORING_ENABLED
+				ig_intr_md_for_dprsr.resubmit_type = 3w1; 
 				mirror_to_collector(MIRROR_SESSION_RDMA_ID_IG); // ig_mirror all RDMA packets
 				#endif
 			}
@@ -163,6 +166,30 @@ control SwitchEgress(
     inout egress_intrinsic_metadata_for_deparser_t eg_intr_md_for_dprsr,
     inout egress_intrinsic_metadata_for_output_port_t eg_intr_md_for_oport){
 
+	Register<bit<32>,bit<1>>(1,0) flowlet_counter;
+
+	RegisterAction<_,_,bit<32>>(flowlet_counter)
+	get_flowlet_count={
+		void apply(inout bit<32> data,out bit<32> count){
+			count=data;
+		}
+	};
+
+	RegisterAction<_,_,bit<32>>(flowlet_counter)
+	update_flowlet_count={
+		void apply(inout bit<32> data){
+			data=data+1;
+		}
+	};
+
+	RegisterAction<_,_,bit<32>>(flowlet_counter)
+	reset_flowlet_count={
+		void apply(inout bit<32> data){
+			data=0;
+		}
+	};
+
+
 
 	apply{
 		#ifdef IG_MIRRORING_ENABLED
@@ -174,6 +201,9 @@ control SwitchEgress(
         	hdr.udp.src_port=16w4791;
 		}
 		#endif
+		if(meta.new_flowlet==1){
+			update_flowlet_count.execute(0);
+		}
 
 	}
 
