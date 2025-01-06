@@ -99,6 +99,16 @@ control SwitchIngress(
 		meta.ig_mirror1.mirrored = (bit<8>)IG_MIRROR_TYPE_1;
     }
 
+	Register<bit<32>,bit<1>>(1) flowlet_counter;
+
+
+	RegisterAction<bit<32>,bit<1>,bit<1>>(flowlet_counter)
+	update_flowlet_count={
+		void apply(inout bit<32> data,out bit<1> rv){
+			data=data|+|1;
+		}
+	};
+
 	// table exact_forward {
 	// 	key = {
 	// 		hdr.ethernet.dst_addr: exact;
@@ -140,6 +150,9 @@ control SwitchIngress(
 			random_forward.apply();
 
 			if (hdr.bth.isValid()){ // if RDMA
+				if(meta.new_flowlet==1){
+					update_flowlet_count.execute(0);
+				}
 				#ifdef IG_MIRRORING_ENABLED
 				ig_intr_md_for_dprsr.resubmit_type = 3w1; 
 				mirror_to_collector(MIRROR_SESSION_RDMA_ID_IG); // ig_mirror all RDMA packets
@@ -166,23 +179,11 @@ control SwitchEgress(
     inout egress_intrinsic_metadata_for_deparser_t eg_intr_md_for_dprsr,
     inout egress_intrinsic_metadata_for_output_port_t eg_intr_md_for_oport){
 
-	Register<bit<32>,bit<1>>(1) flowlet_counter;
-
-
-	RegisterAction<bit<32>,bit<1>,bit<1>>(flowlet_counter)
-	update_flowlet_count={
-		void apply(inout bit<32> data,out bit<1> rv){
-			data=data|+|1;
-		}
-	};
 
 
 
 
 	apply{
-		if(meta.new_flowlet==1w1){
-			update_flowlet_count.execute(0);
-		}
 
 		#ifdef IG_MIRRORING_ENABLED
 		if (meta.ig_mirror1.mirrored == (bit<8>)IG_MIRROR_TYPE_1) {
