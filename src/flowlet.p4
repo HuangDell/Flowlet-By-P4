@@ -166,32 +166,24 @@ control SwitchEgress(
     inout egress_intrinsic_metadata_for_deparser_t eg_intr_md_for_dprsr,
     inout egress_intrinsic_metadata_for_output_port_t eg_intr_md_for_oport){
 
-	Register<bit<32>,bit<1>>(1,0) flowlet_counter;
+	Register<bit<32>,bit<1>>(1) flowlet_counter;
 
-	RegisterAction<_,_,bit<32>>(flowlet_counter)
-	get_flowlet_count={
-		void apply(inout bit<32> data,out bit<32> count){
-			count=data;
-		}
-	};
 
-	RegisterAction<_,_,bit<32>>(flowlet_counter)
+	RegisterAction<bit<32>,bit<1>,bit<1>>(flowlet_counter)
 	update_flowlet_count={
-		void apply(inout bit<32> data){
-			data=data+1;
+		void apply(inout bit<32> data,out bit<1> rv){
+			data=data|+|1;
 		}
 	};
 
-	RegisterAction<_,_,bit<32>>(flowlet_counter)
-	reset_flowlet_count={
-		void apply(inout bit<32> data){
-			data=0;
-		}
-	};
 
 
 
 	apply{
+		if(meta.new_flowlet==1w1){
+			update_flowlet_count.execute(0);
+		}
+
 		#ifdef IG_MIRRORING_ENABLED
 		if (meta.ig_mirror1.mirrored == (bit<8>)IG_MIRROR_TYPE_1) {
 			/* Timestamp -> MAC Src Address*/
@@ -201,10 +193,6 @@ control SwitchEgress(
         	hdr.udp.src_port=16w4791;
 		}
 		#endif
-		if(meta.new_flowlet==1){
-			update_flowlet_count.execute(0);
-		}
-
 	}
 
 

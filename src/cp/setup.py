@@ -93,8 +93,6 @@ def add_arp(dev_ports):
     bfrt.pre.mgid.add(MGID=1, MULTICAST_NODE_ID=[0], MULTICAST_NODE_L1_XID_VALID=[False], MULTICAST_NODE_L1_XID=[0])
 
 
-
-
 for port_config in fp_port_configs:
     add_port_config(port_config)
 
